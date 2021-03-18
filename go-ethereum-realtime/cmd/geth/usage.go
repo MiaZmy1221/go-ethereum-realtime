@@ -44,7 +44,8 @@ var AppHelpFlagGroups = []flags.FlagGroup{
 			utils.MainnetFlag,
 			utils.GoerliFlag,
 			utils.RinkebyFlag,
-			utils.YoloV3Flag,
+			// TODO: Re-enable this when 2718/2930 is added
+			//utils.YoloV3Flag,
 			utils.RopstenFlag,
 			utils.SyncModeFlag,
 			utils.ExitWhenSyncedFlag,
@@ -67,7 +68,6 @@ var AppHelpFlagGroups = []flags.FlagGroup{
 			utils.UltraLightFractionFlag,
 			utils.UltraLightOnlyAnnounceFlag,
 			utils.LightNoPruneFlag,
-			utils.LightNoSyncServeFlag,
 		},
 	},
 	{
@@ -152,7 +152,6 @@ var AppHelpFlagGroups = []flags.FlagGroup{
 			utils.GraphQLVirtualHostsFlag,
 			utils.RPCGlobalGasCapFlag,
 			utils.RPCGlobalTxFeeCapFlag,
-			utils.AllowUnprotectedTxs,
 			utils.JSpathFlag,
 			utils.ExecFlag,
 			utils.PreloadJSFlag,
@@ -162,6 +161,8 @@ var AppHelpFlagGroups = []flags.FlagGroup{
 		Name: "NETWORKING",
 		Flags: []cli.Flag{
 			utils.BootnodesFlag,
+			utils.LegacyBootnodesV4Flag,
+			utils.LegacyBootnodesV5Flag,
 			utils.DNSDiscoveryFlag,
 			utils.ListenPortFlag,
 			utils.MaxPeersFlag,
@@ -217,8 +218,12 @@ var AppHelpFlagGroups = []flags.FlagGroup{
 		Flags: metricsFlags,
 	},
 	{
+		Name:  "WHISPER (deprecated)",
+		Flags: whisperFlags,
+	},
+	{
 		Name: "ALIASED (deprecated)",
-		Flags: []cli.Flag{
+		Flags: append([]cli.Flag{
 			utils.NoUSBFlag,
 			utils.LegacyRPCEnabledFlag,
 			utils.LegacyRPCListenAddrFlag,
@@ -226,13 +231,20 @@ var AppHelpFlagGroups = []flags.FlagGroup{
 			utils.LegacyRPCCORSDomainFlag,
 			utils.LegacyRPCVirtualHostsFlag,
 			utils.LegacyRPCApiFlag,
-		},
+			utils.LegacyWSListenAddrFlag,
+			utils.LegacyWSPortFlag,
+			utils.LegacyWSAllowedOriginsFlag,
+			utils.LegacyWSApiFlag,
+			utils.LegacyGpoBlocksFlag,
+			utils.LegacyGpoPercentileFlag,
+			utils.LegacyGraphQLListenAddrFlag,
+			utils.LegacyGraphQLPortFlag,
+		}, debug.DeprecatedFlags...),
 	},
 	{
 		Name: "MISC",
 		Flags: []cli.Flag{
 			utils.SnapshotFlag,
-			utils.BloomFilterSizeFlag,
 			cli.HelpFlag,
 		},
 	},

@@ -14,8 +14,7 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
-// Package ethconfig contains the configuration of the ETH and LES protocols.
-package ethconfig
+package eth
 
 import (
 	"math/big"
@@ -26,35 +25,30 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/consensus"
-	"github.com/ethereum/go-ethereum/consensus/clique"
 	"github.com/ethereum/go-ethereum/consensus/ethash"
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/eth/downloader"
 	"github.com/ethereum/go-ethereum/eth/gasprice"
-	"github.com/ethereum/go-ethereum/ethdb"
-	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/miner"
-	"github.com/ethereum/go-ethereum/node"
 	"github.com/ethereum/go-ethereum/params"
 )
 
-// FullNodeGPO contains default gasprice oracle settings for full node.
-var FullNodeGPO = gasprice.Config{
+// DefaultFullGPOConfig contains default gasprice oracle settings for full node.
+var DefaultFullGPOConfig = gasprice.Config{
 	Blocks:     20,
 	Percentile: 60,
 	MaxPrice:   gasprice.DefaultMaxPrice,
 }
 
-// LightClientGPO contains default gasprice oracle settings for light client.
-var LightClientGPO = gasprice.Config{
+// DefaultLightGPOConfig contains default gasprice oracle settings for light client.
+var DefaultLightGPOConfig = gasprice.Config{
 	Blocks:     2,
 	Percentile: 60,
 	MaxPrice:   gasprice.DefaultMaxPrice,
 }
 
-// Defaults contains default settings for use on the Ethereum main net.
-var Defaults = Config{
+// DefaultConfig contains default settings for use on the Ethereum main net.
+var DefaultConfig = Config{
 	SyncMode: downloader.FastSync,
 	Ethash: ethash.Config{
 		CacheDir:         "ethash",
@@ -66,7 +60,6 @@ var Defaults = Config{
 		DatasetsLockMmap: false,
 	},
 	NetworkId:               1,
-	TxLookupLimit:           2350000,
 	LightPeers:              100,
 	UltraLightFraction:      75,
 	DatabaseCache:           512,
@@ -84,7 +77,7 @@ var Defaults = Config{
 	},
 	TxPool:      core.DefaultTxPoolConfig,
 	RPCGasCap:   25000000,
-	GPO:         FullNodeGPO,
+	GPO:         DefaultFullGPOConfig,
 	RPCTxFeeCap: 1, // 1 ether
 }
 
@@ -96,22 +89,21 @@ func init() {
 		}
 	}
 	if runtime.GOOS == "darwin" {
-		Defaults.Ethash.DatasetDir = filepath.Join(home, "Library", "Ethash")
+		DefaultConfig.Ethash.DatasetDir = filepath.Join(home, "Library", "Ethash")
 	} else if runtime.GOOS == "windows" {
 		localappdata := os.Getenv("LOCALAPPDATA")
 		if localappdata != "" {
-			Defaults.Ethash.DatasetDir = filepath.Join(localappdata, "Ethash")
+			DefaultConfig.Ethash.DatasetDir = filepath.Join(localappdata, "Ethash")
 		} else {
-			Defaults.Ethash.DatasetDir = filepath.Join(home, "AppData", "Local", "Ethash")
+			DefaultConfig.Ethash.DatasetDir = filepath.Join(home, "AppData", "Local", "Ethash")
 		}
 	} else {
-		Defaults.Ethash.DatasetDir = filepath.Join(home, ".ethash")
+		DefaultConfig.Ethash.DatasetDir = filepath.Join(home, ".ethash")
 	}
 }
 
 //go:generate gencodec -type Config -formats toml -out gen_config.go
 
-// Config contains configuration options for of the ETH and LES protocols.
 type Config struct {
 	// The genesis block, which is inserted if the database is empty.
 	// If nil, the Ethereum main net block is used.
@@ -140,7 +132,6 @@ type Config struct {
 	LightEgress        int  `toml:",omitempty"` // Outgoing bandwidth limit for light servers
 	LightPeers         int  `toml:",omitempty"` // Maximum number of LES client peers
 	LightNoPrune       bool `toml:",omitempty"` // Whether to disable light chain pruning
-	LightNoSyncServe   bool `toml:",omitempty"` // Whether to serve light clients before syncing
 	SyncFromCheckpoint bool `toml:",omitempty"` // Whether to sync the header chain from the configured checkpoint
 
 	// Ultra Light client options
@@ -198,40 +189,4 @@ type Config struct {
 
 	// CheckpointOracle is the configuration for checkpoint oracle.
 	CheckpointOracle *params.CheckpointOracleConfig `toml:",omitempty"`
-
-	// Berlin block override (TODO: remove after the fork)
-	OverrideBerlin *big.Int `toml:",omitempty"`
-}
-
-// CreateConsensusEngine creates a consensus engine for the given chain configuration.
-func CreateConsensusEngine(stack *node.Node, chainConfig *params.ChainConfig, config *ethash.Config, notify []string, noverify bool, db ethdb.Database) consensus.Engine {
-	// If proof-of-authority is requested, set it up
-	if chainConfig.Clique != nil {
-		return clique.New(chainConfig.Clique, db)
-	}
-	// Otherwise assume proof-of-work
-	switch config.PowMode {
-	case ethash.ModeFake:
-		log.Warn("Ethash used in fake mode")
-		return ethash.NewFaker()
-	case ethash.ModeTest:
-		log.Warn("Ethash used in test mode")
-		return ethash.NewTester(nil, noverify)
-	case ethash.ModeShared:
-		log.Warn("Ethash used in shared mode")
-		return ethash.NewShared()
-	default:
-		engine := ethash.New(ethash.Config{
-			CacheDir:         stack.ResolvePath(config.CacheDir),
-			CachesInMem:      config.CachesInMem,
-			CachesOnDisk:     config.CachesOnDisk,
-			CachesLockMmap:   config.CachesLockMmap,
-			DatasetDir:       config.DatasetDir,
-			DatasetsInMem:    config.DatasetsInMem,
-			DatasetsOnDisk:   config.DatasetsOnDisk,
-			DatasetsLockMmap: config.DatasetsLockMmap,
-		}, notify, noverify)
-		engine.SetThreads(-1) // Disable CPU mining
-		return engine
-	}
 }

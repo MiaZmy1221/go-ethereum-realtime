@@ -25,7 +25,7 @@ import (
 )
 
 var (
-	CommandHelpTemplate = `{{.cmd.Name}}{{if .cmd.Subcommands}} command{{end}}{{if .cmd.Flags}} [command options]{{end}} {{.cmd.ArgsUsage}}
+	CommandHelpTemplate = `{{.cmd.Name}}{{if .cmd.Subcommands}} command{{end}}{{if .cmd.Flags}} [command options]{{end}} [arguments...]
 {{if .cmd.Description}}{{.cmd.Description}}
 {{end}}{{if .cmd.Subcommands}}
 SUBCOMMANDS:
@@ -36,7 +36,7 @@ SUBCOMMANDS:
 {{end}}
 {{end}}{{end}}`
 
-	OriginCommandHelpTemplate = `{{.Name}}{{if .Subcommands}} command{{end}}{{if .Flags}} [command options]{{end}} {{.ArgsUsage}}
+	OriginCommandHelpTemplate = `{{.Name}}{{if .Subcommands}} command{{end}}{{if .Flags}} [command options]{{end}} [arguments...]
 {{if .Description}}{{.Description}}
 {{end}}{{if .Subcommands}}
 SUBCOMMANDS:

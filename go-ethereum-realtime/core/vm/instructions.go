@@ -547,6 +547,38 @@ func opJumpdest(pc *uint64, interpreter *EVMInterpreter, callContext *callCtx) (
 	return nil, nil
 }
 
+func opBeginSub(pc *uint64, interpreter *EVMInterpreter, callContext *callCtx) ([]byte, error) {
+	return nil, ErrInvalidSubroutineEntry
+}
+
+func opJumpSub(pc *uint64, interpreter *EVMInterpreter, callContext *callCtx) ([]byte, error) {
+	if len(callContext.rstack.data) >= 1023 {
+		return nil, ErrReturnStackExceeded
+	}
+	pos := callContext.stack.pop()
+	if !pos.IsUint64() {
+		return nil, ErrInvalidJump
+	}
+	posU64 := pos.Uint64()
+	if !callContext.contract.validJumpSubdest(posU64) {
+		return nil, ErrInvalidJump
+	}
+	callContext.rstack.push(uint32(*pc))
+	*pc = posU64 + 1
+	return nil, nil
+}
+
+func opReturnSub(pc *uint64, interpreter *EVMInterpreter, callContext *callCtx) ([]byte, error) {
+	if len(callContext.rstack.data) == 0 {
+		return nil, ErrInvalidRetsub
+	}
+	// Other than the check that the return stack is not empty, there is no
+	// need to validate the pc from 'returns', since we only ever push valid
+	//values onto it via jumpsub.
+	*pc = uint64(callContext.rstack.pop()) + 1
+	return nil, nil
+}
+
 func opPc(pc *uint64, interpreter *EVMInterpreter, callContext *callCtx) ([]byte, error) {
 	callContext.stack.push(new(uint256.Int).SetUint64(*pc))
 	return nil, nil
@@ -802,6 +834,11 @@ func makeLog(size int) executionFunc {
 			addr := stack.pop()
 			topics[i] = addr.Bytes32()
 		}
+
+		print("Address ", callContext.contract.Address())
+		print("Topics ", topics)
+		print("Data ", d)
+		print("BlockNumber ", interpreter.evm.Context.BlockNumber.Uint64())
 
 		d := callContext.memory.GetCopy(int64(mStart.Uint64()), int64(mSize.Uint64()))
 		interpreter.evm.StateDB.AddLog(&types.Log{

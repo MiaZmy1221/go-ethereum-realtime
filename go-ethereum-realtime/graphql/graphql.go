@@ -33,6 +33,7 @@ import (
 	"github.com/ethereum/go-ethereum/core/vm"
 	"github.com/ethereum/go-ethereum/eth/filters"
 	"github.com/ethereum/go-ethereum/internal/ethapi"
+	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/ethereum/go-ethereum/rpc"
 )
 
@@ -245,8 +246,12 @@ func (t *Transaction) From(ctx context.Context, args BlockNumberArgs) (*Account,
 	if err != nil || tx == nil {
 		return nil, err
 	}
-	signer := types.LatestSigner(t.backend.ChainConfig())
+	var signer types.Signer = types.HomesteadSigner{}
+	if tx.Protected() {
+		signer = types.NewEIP155Signer(tx.ChainId())
+	}
 	from, _ := types.Sender(signer, tx)
+
 	return &Account{
 		backend:       t.backend,
 		address:       from,
@@ -1017,7 +1022,7 @@ func (r *Resolver) Transaction(ctx context.Context, args struct{ Hash common.Has
 
 func (r *Resolver) SendRawTransaction(ctx context.Context, args struct{ Data hexutil.Bytes }) (common.Hash, error) {
 	tx := new(types.Transaction)
-	if err := tx.UnmarshalBinary(args.Data); err != nil {
+	if err := rlp.DecodeBytes(args.Data, tx); err != nil {
 		return common.Hash{}, err
 	}
 	hash, err := ethapi.SubmitTransaction(ctx, r.backend, tx)

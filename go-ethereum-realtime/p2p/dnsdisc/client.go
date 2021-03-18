@@ -217,11 +217,8 @@ type randomIterator struct {
 	c        *Client
 
 	mu    sync.Mutex
-	lc    linkCache              // tracks tree dependencies
 	trees map[string]*clientTree // all trees
-	// buffers for syncableTrees
-	syncableList []*clientTree
-	disabledList []*clientTree
+	lc    linkCache              // tracks tree dependencies
 }
 
 func (c *Client) newRandomIterator() *randomIterator {
@@ -241,10 +238,10 @@ func (it *randomIterator) Node() *enode.Node {
 
 // Close closes the iterator.
 func (it *randomIterator) Close() {
-	it.cancelFn()
-
 	it.mu.Lock()
 	defer it.mu.Unlock()
+
+	it.cancelFn()
 	it.trees = nil
 }
 
@@ -267,7 +264,7 @@ func (it *randomIterator) addTree(url string) error {
 // nextNode syncs random tree entries until it finds a node.
 func (it *randomIterator) nextNode() *enode.Node {
 	for {
-		ct := it.pickTree()
+		ct := it.nextTree()
 		if ct == nil {
 			return nil
 		}
@@ -285,79 +282,26 @@ func (it *randomIterator) nextNode() *enode.Node {
 	}
 }
 
-// pickTree returns a random tree to sync from.
-func (it *randomIterator) pickTree() *clientTree {
+// nextTree returns a random tree.
+func (it *randomIterator) nextTree() *clientTree {
 	it.mu.Lock()
 	defer it.mu.Unlock()
 
-	// Rebuild the trees map if any links have changed.
 	if it.lc.changed {
 		it.rebuildTrees()
 		it.lc.changed = false
 	}
-
-	for {
-		canSync, trees := it.syncableTrees()
-		switch {
-		case canSync:
-			// Pick a random tree.
-			return trees[rand.Intn(len(trees))]
-		case len(trees) > 0:
-			// No sync action can be performed on any tree right now. The only meaningful
-			// thing to do is waiting for any root record to get updated.
-			if !it.waitForRootUpdates(trees) {
-				// Iterator was closed while waiting.
-				return nil
-			}
-		default:
-			// There are no trees left, the iterator was closed.
-			return nil
-		}
+	if len(it.trees) == 0 {
+		return nil
 	}
-}
-
-// syncableTrees finds trees on which any meaningful sync action can be performed.
-func (it *randomIterator) syncableTrees() (canSync bool, trees []*clientTree) {
-	// Resize tree lists.
-	it.syncableList = it.syncableList[:0]
-	it.disabledList = it.disabledList[:0]
-
-	// Partition them into the two lists.
+	limit := rand.Intn(len(it.trees))
 	for _, ct := range it.trees {
-		if ct.canSyncRandom() {
-			it.syncableList = append(it.syncableList, ct)
-		} else {
-			it.disabledList = append(it.disabledList, ct)
+		if limit == 0 {
+			return ct
 		}
+		limit--
 	}
-	if len(it.syncableList) > 0 {
-		return true, it.syncableList
-	}
-	return false, it.disabledList
-}
-
-// waitForRootUpdates waits for the closest scheduled root check time on the given trees.
-func (it *randomIterator) waitForRootUpdates(trees []*clientTree) bool {
-	var minTree *clientTree
-	var nextCheck mclock.AbsTime
-	for _, ct := range trees {
-		check := ct.nextScheduledRootCheck()
-		if minTree == nil || check < nextCheck {
-			minTree = ct
-			nextCheck = check
-		}
-	}
-
-	sleep := nextCheck.Sub(it.c.clock.Now())
-	it.c.cfg.Logger.Debug("DNS iterator waiting for root updates", "sleep", sleep, "tree", minTree.loc.domain)
-	timeout := it.c.clock.NewTimer(sleep)
-	defer timeout.Stop()
-	select {
-	case <-timeout.C():
-		return true
-	case <-it.ctx.Done():
-		return false // Iterator was closed.
-	}
+	return nil
 }
 
 // rebuildTrees rebuilds the 'trees' map.

@@ -346,6 +346,7 @@ func (d *Downloader) Synchronise(id string, head common.Hash, td *big.Int, mode 
 	case nil, errBusy, errCanceled:
 		return err
 	}
+
 	if errors.Is(err, errInvalidChain) || errors.Is(err, errBadPeer) || errors.Is(err, errTimeout) ||
 		errors.Is(err, errStallingPeer) || errors.Is(err, errUnsyncedPeer) || errors.Is(err, errEmptyHeaderSet) ||
 		errors.Is(err, errPeersUnavailable) || errors.Is(err, errTooOld) || errors.Is(err, errInvalidAncestor) {
@@ -1387,7 +1388,7 @@ func (d *Downloader) fetchParts(deliveryCh chan dataPack, deliver func(dataPack)
 				case err == nil:
 					peer.log.Trace("Delivered new batch of data", "type", kind, "count", packet.Stats())
 				default:
-					peer.log.Debug("Failed to deliver retrieved data", "type", kind, "err", err)
+					peer.log.Trace("Failed to deliver retrieved data", "type", kind, "err", err)
 				}
 			}
 			// Blocks assembled, try to update the progress
@@ -1763,7 +1764,7 @@ func (d *Downloader) processFastSyncContent() error {
 	}()
 
 	closeOnErr := func(s *stateSync) {
-		if err := s.Wait(); err != nil && err != errCancelStateFetch && err != errCanceled && err != snap.ErrCancelled {
+		if err := s.Wait(); err != nil && err != errCancelStateFetch && err != errCanceled {
 			d.queue.Close() // wake up Results
 		}
 	}

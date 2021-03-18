@@ -599,7 +599,6 @@ func (ns *NodeStateMachine) updateEnode(n *enode.Node) (enode.ID, *nodeInfo) {
 	node := ns.nodes[id]
 	if node != nil && n.Seq() > node.node.Seq() {
 		node.node = n
-		node.dirty = true
 	}
 	return id, node
 }

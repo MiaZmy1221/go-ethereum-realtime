@@ -142,18 +142,18 @@ func (p *Peer) announceTransactions() {
 		if done == nil && len(queue) > 0 {
 			// Pile transaction hashes until we reach our allowed network limit
 			var (
-				count   int
+				hashes  []common.Hash
 				pending []common.Hash
 				size    common.StorageSize
 			)
-			for count = 0; count < len(queue) && size < maxTxPacketSize; count++ {
-				if p.txpool.Get(queue[count]) != nil {
-					pending = append(pending, queue[count])
+			for i := 0; i < len(queue) && size < maxTxPacketSize; i++ {
+				if p.txpool.Get(queue[i]) != nil {
+					pending = append(pending, queue[i])
 					size += common.HashLength
 				}
+				hashes = append(hashes, queue[i])
 			}
-			// Shift and trim queue
-			queue = queue[:copy(queue, queue[count:])]
+			queue = queue[:copy(queue, queue[len(hashes):])]
 
 			// If there's anything available to transfer, fire up an async writer
 			if len(pending) > 0 {

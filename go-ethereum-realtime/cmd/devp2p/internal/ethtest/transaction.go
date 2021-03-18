@@ -30,13 +30,9 @@ var faucetKey, _ = crypto.HexToECDSA("b71c71a67e1177ad4e901695e1b4b9ee17ae16c666
 
 func sendSuccessfulTx(t *utesting.T, s *Suite, tx *types.Transaction) {
 	sendConn := s.setupConnection(t)
-	sendSuccessfulTxWithConn(t, s, tx, sendConn)
-}
-
-func sendSuccessfulTxWithConn(t *utesting.T, s *Suite, tx *types.Transaction, sendConn *Conn) {
 	t.Logf("sending tx: %v %v %v\n", tx.Hash().String(), tx.GasPrice(), tx.Gas())
 	// Send the transaction
-	if err := sendConn.Write(&Transactions{tx}); err != nil {
+	if err := sendConn.Write(Transactions([]*types.Transaction{tx})); err != nil {
 		t.Fatal(err)
 	}
 	time.Sleep(100 * time.Millisecond)
@@ -45,21 +41,20 @@ func sendSuccessfulTxWithConn(t *utesting.T, s *Suite, tx *types.Transaction, se
 	switch msg := recvConn.ReadAndServe(s.chain, timeout).(type) {
 	case *Transactions:
 		recTxs := *msg
-		for _, gotTx := range recTxs {
-			if gotTx.Hash() == tx.Hash() {
-				// Ok
-				return
-			}
+		if len(recTxs) < 1 {
+			t.Fatalf("received transactions do not match send: %v", recTxs)
 		}
-		t.Fatalf("missing transaction: got %v missing %v", recTxs, tx.Hash())
+		if tx.Hash() != recTxs[len(recTxs)-1].Hash() {
+			t.Fatalf("received transactions do not match send: got %v want %v", recTxs, tx)
+		}
 	case *NewPooledTransactionHashes:
 		txHashes := *msg
-		for _, gotHash := range txHashes {
-			if gotHash == tx.Hash() {
-				return
-			}
+		if len(txHashes) < 1 {
+			t.Fatalf("received transactions do not match send: %v", txHashes)
 		}
-		t.Fatalf("missing transaction announcement: got %v missing %v", txHashes, tx.Hash())
+		if tx.Hash() != txHashes[len(txHashes)-1] {
+			t.Fatalf("wrong announcement received, wanted %v got %v", tx, txHashes)
+		}
 	default:
 		t.Fatalf("unexpected message in sendSuccessfulTx: %s", pretty.Sdump(msg))
 	}
@@ -67,10 +62,6 @@ func sendSuccessfulTxWithConn(t *utesting.T, s *Suite, tx *types.Transaction, se
 
 func sendFailingTx(t *utesting.T, s *Suite, tx *types.Transaction) {
 	sendConn, recvConn := s.setupConnection(t), s.setupConnection(t)
-	sendFailingTxWithConns(t, s, tx, sendConn, recvConn)
-}
-
-func sendFailingTxWithConns(t *utesting.T, s *Suite, tx *types.Transaction, sendConn, recvConn *Conn) {
 	// Wait for a transaction announcement
 	switch msg := recvConn.ReadAndServe(s.chain, timeout).(type) {
 	case *NewPooledTransactionHashes:
@@ -79,7 +70,7 @@ func sendFailingTxWithConns(t *utesting.T, s *Suite, tx *types.Transaction, send
 		t.Logf("unexpected message, logging: %v", pretty.Sdump(msg))
 	}
 	// Send the transaction
-	if err := sendConn.Write(&Transactions{tx}); err != nil {
+	if err := sendConn.Write(Transactions([]*types.Transaction{tx})); err != nil {
 		t.Fatal(err)
 	}
 	// Wait for another transaction announcement
